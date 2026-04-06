@@ -54,6 +54,7 @@ boolean CheckerDT_Node_isValid(Node_T oNNode) {
 */
 static boolean CheckerDT_treeCheck(Node_T oNNode, size_t *totalCount) {
    size_t ulIndex;
+   Node_T prevChild = NULL;
 
    assert(totalCount != NULL);
 
@@ -92,6 +93,13 @@ static boolean CheckerDT_treeCheck(Node_T oNNode, size_t *totalCount) {
          return FALSE;
       }
 
+      if (prevChild != NULL) {
+         if(Node_compare(prevChild, oNChild) >= 0) {
+            fprintf(stderr, "children are not in lexicographic order\n");
+            return FALSE;
+         }
+      }
+
       if(Node_getParent(oNChild) != oNNode) {
          fprintf(stderr, "children of the same parent node does not share the same parent\n");
          return FALSE;
@@ -120,6 +128,8 @@ static boolean CheckerDT_treeCheck(Node_T oNNode, size_t *totalCount) {
             }
          }
       }
+
+      prevChild = oNChild;
 
       if(!CheckerDT_treeCheck(oNChild, &childCount))
          return FALSE;
