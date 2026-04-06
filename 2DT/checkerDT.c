@@ -94,7 +94,8 @@ static boolean CheckerDT_treeCheck(Node_T oNNode, size_t *totalCount) {
       }
 
       if (prevChild != NULL) {
-         if(Node_compare(prevChild, oNChild) >= 0) {
+         if(Path_comparePath(Node_getPath(prevChild),
+                       Node_getPath(oNChild)) >= 0) {
             fprintf(stderr, "children are not in lexicographic order\n");
             return FALSE;
          }
