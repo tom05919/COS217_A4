@@ -52,42 +52,89 @@ boolean CheckerDT_Node_isValid(Node_T oNNode) {
    parameter list to facilitate constructing your checks.
    If you do, you should update this function comment.
 */
-static boolean CheckerDT_treeCheck(Node_T oNNode) {
+static boolean CheckerDT_treeCheck(Node_T oNNode, size_t *totalCount) {
    size_t ulIndex;
 
-   if(oNNode!= NULL) {
+   assert(totalCount != NULL);
 
-      /* Sample check on each node: node must be valid */
-      /* If not, pass that failure back up immediately */
-      if(!CheckerDT_Node_isValid(oNNode))
+   if(oNNode == NULL) {
+      *totalCount = 0;
+      return TRUE;
+   }
+
+   *totalCount = 1;
+
+   if(!CheckerDT_Node_isValid(oNNode))
+      return FALSE;
+   
+   if(Node_getParent(oNNode) == NULL) {
+      if(Path_getDepth(Node_getPath(oNNode)) != 1) {
+         fprintf(stderr, "depth of root node is not 1\n");
          return FALSE;
+      }
+   }
+      
+   if(Path_getDepth(Node_getPath(oNNode)) == 1) {
+      if(Node_getParent(oNNode) != NULL) {
+         fprintf(stderr, "parent node of root node is not NULL\n");
+         return FALSE;
+      }
+   }
 
-      /* Recur on every child of oNNode */
-      for(ulIndex = 0; ulIndex < Node_getNumChildren(oNNode); ulIndex++)
-      {
-         Node_T oNChild = NULL;
-         int iStatus = Node_getChild(oNNode, ulIndex, &oNChild);
+   for(ulIndex = 0; ulIndex < Node_getNumChildren(oNNode); ulIndex++) {
+      Node_T oNChild = NULL;
+      int iStatus = Node_getChild(oNNode, ulIndex, &oNChild);
+      size_t i;
+      size_t childCount = 0;
 
-         if(iStatus != SUCCESS) {
+      if(iStatus != SUCCESS) {
+         fprintf(stderr, "getNumChildren claims more children than getChild returns\n");
+         return FALSE;
+      }
+
+      if(Node_getParent(oNChild) != oNNode) {
+         fprintf(stderr, "children of the same parent node does not share the same parent\n");
+         return FALSE;
+      }
+
+      if(Path_getDepth(Node_getPath(oNNode)) !=
+         Path_getDepth(Node_getPath(oNChild)) - 1) {
+         fprintf(stderr, "child node depth is not correct, should be depth of parent + 1\n");
+         return FALSE;
+      }
+
+      for(i = 0; i < Node_getNumChildren(oNNode); i++) {
+         Node_T child = NULL;
+         int iStatus2 = Node_getChild(oNNode, i, &child);
+
+         if(iStatus2 != SUCCESS) {
             fprintf(stderr, "getNumChildren claims more children than getChild returns\n");
             return FALSE;
          }
 
-         /* if recurring down one subtree results in a failed check
-            farther down, passes the failure back up immediately */
-         if(!CheckerDT_treeCheck(oNChild))
-            return FALSE;
+         if(i != ulIndex) {
+            if(Path_comparePath(Node_getPath(child),
+                                Node_getPath(oNChild)) == 0) {
+               fprintf(stderr, "different children of the same parent share the same path\n");
+               return FALSE;
+            }
+         }
       }
+
+      if(!CheckerDT_treeCheck(oNChild, &childCount))
+         return FALSE;
+
+      *totalCount += childCount;
    }
+
    return TRUE;
 }
 
 /* see checkerDT.h for specification */
 boolean CheckerDT_isValid(boolean bIsInitialized, Node_T oNRoot,
                           size_t ulCount) {
+   size_t count = 0;
 
-   /* Sample check on a top-level data structure invariant:
-      if the DT is not initialized, its count should be 0. */
    if(!bIsInitialized) {
       if(ulCount != 0) {
          fprintf(stderr, "Not initialized, but count is not 0\n");
@@ -99,6 +146,14 @@ boolean CheckerDT_isValid(boolean bIsInitialized, Node_T oNRoot,
          return FALSE;
       }
    }
-   /* Now checks invariants recursively at each node from the root. */
-   return CheckerDT_treeCheck(oNRoot);
+
+   if(!CheckerDT_treeCheck(oNRoot, &count))
+      return FALSE;
+   
+   if(count != ulCount) {
+      fprintf(stderr, "stored node count does not match actual tree size\n");
+      return FALSE;
+   }
+
+   return TRUE;
 }
