@@ -30,6 +30,15 @@ struct node {
 
 };
 
+/* come back to this and add comments */
+static boolean Node_find(Node_T oNParent, Path_T oPPath, NodeType uType, size_t *pulIndex) {
+   struct node sDummy;
+   sDummy.oPPath = oPPath;
+   sDummy.uType = uType;
+   
+   return DynArray_bsearch(oNParent->oDChildren, &sDummy, pulIndex, (int(*)(const void*, const void*))Node_compare);
+}
+
 /*
   Built upon the original node logic.
   Can take in either a directory or file node, determined by NodeType.
@@ -107,6 +116,8 @@ int Node_new(Path_T oPPath, Node_T oNParent, NodeType uType, Node_T *poNResult, 
          *poNResult = NULL;
          return ALREADY_IN_TREE;
       }
+      /* updates ulIndex to the spot it should be in case hasChild messes it up */
+      Node_find(oNParent, oPPath, uType, &ulIndex);
    }
    else {
 		/* new node must be root AND dir */
@@ -114,7 +125,7 @@ int Node_new(Path_T oPPath, Node_T oNParent, NodeType uType, Node_T *poNResult, 
 			Path_free(psNew->oPPath);
 			free(psNew);
 			*poNResult = NULL;
-			return NOT_A_DIRECTORY;
+			return CONFLICTING_PATH;
 		}
 
       /* can only create one "level" at a time */
@@ -185,34 +196,104 @@ int Node_new(Path_T oPPath, Node_T oNParent, NodeType uType, Node_T *poNResult, 
 
 	*poNResult = psNew;
 
-   assert(oNParent == NULL || CheckerDT_Node_isValid(oNParent));
-   assert(CheckerDT_Node_isValid(*poNResult));
-
    return SUCCESS;
 }
 
 /* new functions defined before */
 /* Returns the NodeType of a provided node (oNNode)*/
-NodeType Node_getType(Node_T oNNode);
+NodeType Node_getType(Node_T oNNode) {
+   assert(oNNode != NULL);
+
+   return oNNode->uType;
+}
 
 /* Returns a pointer to the contents of a provided file node (oNNode) MUST BE FILE TYPE OTHERWISE RETURN ERROR */
-void *Node_getContents(Node_T oNNode);
+void *Node_getContents(Node_T oNNode) {
+   assert(oNNode != NULL);
+   assert(oNNode->uType == TYPE_FILE);
+   return oNNode->pvContents;
+}
 
 /* returns file length. Cannot call on directory nodes otherwise logic error*/
-size_t Node_getContentsLength(Node_T oNNode);
+size_t Node_getContentsLength(Node_T oNNode) { 
+   assert(oNNode != NULL);
+   assert(oNNode->uType == TYPE_FILE);
 
-/* updates the file contents. Returns the old contents on success, ERROR on failure*/
-void *Node_setContents(Node_T oNNode, void *pvNewContents, size_t ulNewLength);
+   return oNNode->ulLength;
+}
+
+/* updates the file contents. Returns the old contents on success, ERROR on failure, ONLY FOR FILES*/
+void *Node_setContents(Node_T oNNode, void *pvNewContents, size_t ulNewLength) {
+   void *pvOldContents;
+   assert(oNNode != NULL);
+   assert(oNNode->uType == TYPE_FILE);
+   pvOldContents = oNNode->pvContents;
+
+  if (ulNewLength > 0 && pvNewContents != NULL) {
+      oNNode->pvContents = malloc(ulNewLength);
+
+      if (oNNode->pvContents == NULL) {
+         oNNode->pvContents = pvOldContents;
+         return NULL;
+      } 
+
+      memcpy(oNNode->pvContents, pvNewContents, ulNewLength);
+      oNNode->ulLength = ulNewLength;
+
+  } else {
+      /* if new contents is empty, free old contents and set to NULL */
+      oNNode->pvContents = NULL;
+      oNNode->ulLength = 0;
+   }
+
+   return pvOldContents;
+}
 
 /*
   Destroys and frees all memory allocated for the subtree rooted at
   oNNode, i.e., deletes this node and all its descendents. Returns the
   number of nodes deleted.
 */
-size_t Node_free(Node_T oNNode);
+size_t Node_free(Node_T oNNode) {
+   size_t ulCount;
+   size_t ulNumChildren;
+   size_t i;
+   Node_T oChild;
+   assert(oNNode != NULL);
+
+   ulCount = 1;
+
+   if (oNNode->uType == TYPE_DIR) {
+      ulNumChildren = DynArray_getLength(oNNode->oDChildren);
+
+      for(i = 0; i < ulNumChildren; i++) {
+         oChild = DynArray_get(oNNode->oDChildren, i);
+
+         Node_free(oChild);
+
+         ulCount += 1;
+      }
+      /* free the remaining child*/
+      DynArray_free(oNNode->oDChildren);
+   } else {
+      if(oNNode->pvContents != NULL) {
+         free(oNNode->pvContents);
+      }
+   }
+
+   Path_free(oNNode->oPPath);
+   free(oNNode);
+
+   return ulCount;
+   
+}
 
 /* Returns the path object representing oNNode's absolute path. */
-Path_T Node_getPath(Node_T oNNode);
+Path_T Node_getPath(Node_T oNNode) {
+   assert(oNNode != NULL);
+
+   return oNNode->oPPath;
+}
 
 /*
   Returns TRUE if oNParent has a child with path oPPath. Returns
@@ -223,11 +304,28 @@ Path_T Node_getPath(Node_T oNNode);
   such a child, stores in *pulChildID the identifier that such a
   child _would_ have if inserted.
 */
-boolean Node_hasChild(Node_T oNParent, Path_T oPPath,
-                         size_t *pulChildID);
+boolean Node_hasChild(Node_T oNParent, Path_T oPPath, size_t *pulChildID) {
+   struct node TempNode;
+
+   assert(oNParent != NULL);
+   assert(oPPath != NULL);       
+   assert(oNParent->uType == TYPE_DIR);
+   assert(pulChildID != NULL);
+
+   TempNode.oPPath = oPPath;
+   TempNode.uType = TYPE_FILE;
+
+   return DynArray_bsearch(oNParent->oDChildren, &TempNode, pulChildID, (int(*)(const void*, const void*))Node_compare);
+
+}
 
 /* Returns the number of children that oNParent has. */
-size_t Node_getNumChildren(Node_T oNParent);
+size_t Node_getNumChildren(Node_T oNParent) {
+   assert(oNParent != NULL);
+   assert(oNParent->uType == TYPE_DIR);
+
+   return DynArray_getLength(oNParent->oDChildren);
+}
 
 /*
   Returns an int SUCCESS status and sets *poNResult to be the child
@@ -235,8 +333,9 @@ size_t Node_getNumChildren(Node_T oNParent);
   Otherwise, sets *poNResult to NULL and returns status:
   * NO_SUCH_PATH if ulChildID is not a valid child for oNParent
 */
-int Node_getChild(Node_T oNParent, size_t ulChildID,
-                  Node_T *poNResult);
+int Node_getChild(Node_T oNParent, size_t ulChildID, Node_T *poNResult) {
+   
+}
 
 /*
   Returns a the parent node of oNNode.
@@ -249,7 +348,25 @@ Node_T Node_getParent(Node_T oNNode);
   Returns <0, 0, or >0 if onFirst is "less than", "equal to", or
   "greater than" oNSecond, respectively.
 */
-int Node_compare(Node_T oNFirst, Node_T oNSecond);
+int Node_compare(Node_T oNFirst, Node_T oNSecond) {
+   assert(oNFirst != NULL);
+   assert(oNSecond != NULL);
+
+   /* since files come before directories, return -1*/
+   if (oNFirst->uType == TYPE_FILE && oNSecond->uType == TYPE_DIR) {
+      return -1; /* first is less than second*/
+   }
+
+   /* since files come before directories, return 1*/
+   if (oNFirst->uType == TYPE_DIR && oNSecond->uType == TYPE_FILE) {
+      return 1; /* first is greater than second */
+   }
+
+   /* if not opposing types, return compare string like normal */
+   return Path_compareString(Node_getPath(oNFirst), Node_getPath(oNSecond));
+}
+   
+
 
 /*
   Returns a string representation for oNNode, or NULL if
