@@ -27,6 +27,9 @@ typedef enum {TYPE_DIR, TYPE_FILE} NodeType;
 */
 int Node_new(Path_T oPPath, Node_T oNParent, NodeType uType, Node_T *poNResult, size_t ulLength, void *pvContents);
 
+/* Internal helper function - finds a child node */
+boolean Node_find(Node_T oNParent, Path_T oPPath, NodeType uType, size_t *pulIndex);
+
 /* new functions defined before */
 /* Returns the NodeType of a provided node (oNNode)*/
 NodeType Node_getType(Node_T oNNode);
@@ -62,6 +65,9 @@ Path_T Node_getPath(Node_T oNNode);
 boolean Node_hasChild(Node_T oNParent, Path_T oPPath,
                          size_t *pulChildID);
 
+/* Internal helper function - adds a child node */
+int Node_addChild(Node_T oNParent, Node_T oNChild, size_t ulIndex);
+
 /* Returns the number of children that oNParent has. */
 size_t Node_getNumChildren(Node_T oNParent);
 
@@ -80,12 +86,15 @@ int Node_getChild(Node_T oNParent, size_t ulChildID,
 */
 Node_T Node_getParent(Node_T oNNode);
 
+
+/* add comments*/
+int Node_compare(Node_T oNFirst, Node_T oNSecond);
+
 /*
   Compares oNFirst and oNSecond lexicographically based on their paths.
   Returns <0, 0, or >0 if onFirst is "less than", "equal to", or
   "greater than" oNSecond, respectively.
 */
-int Node_compare(Node_T oNFirst, Node_T oNSecond);
 
 /*
   Returns a string representation for oNNode, or NULL if

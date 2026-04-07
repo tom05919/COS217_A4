@@ -31,7 +31,7 @@ struct node {
 };
 
 /* come back to this and add comments */
-static boolean Node_find(Node_T oNParent, Path_T oPPath, NodeType uType, size_t *pulIndex) {
+boolean Node_find(Node_T oNParent, Path_T oPPath, NodeType uType, size_t *pulIndex) {
    struct node sDummy;
    sDummy.oPPath = oPPath;
    sDummy.uType = uType;
@@ -92,7 +92,7 @@ int Node_new(Path_T oPPath, Node_T oNParent, NodeType uType, Node_T *poNResult, 
       ulParentDepth = Path_getDepth(oPParentPath);
       ulSharedDepth = Path_getSharedPrefixDepth(psNew->oPPath,
                                                 oPParentPath);
-                                                
+
       /* parent must be an ancestor of child */
       if(ulSharedDepth < ulParentDepth) {
          Path_free(psNew->oPPath);
@@ -172,7 +172,7 @@ int Node_new(Path_T oPPath, Node_T oNParent, NodeType uType, Node_T *poNResult, 
       else {
          /* empty file*/
          psNew->pvContents = NULL;
-      } 
+      }
 	}
 
 	/* Link into parent's children list */
@@ -198,6 +198,7 @@ int Node_new(Path_T oPPath, Node_T oNParent, NodeType uType, Node_T *poNResult, 
 
    return SUCCESS;
 }
+
 
 /* new functions defined before */
 /* Returns the NodeType of a provided node (oNNode)*/
@@ -325,12 +326,16 @@ boolean Node_hasChild(Node_T oNParent, Path_T oPPath, size_t *pulChildID) {
 
 }
 
-/* Returns the number of children that oNParent has. */
-size_t Node_getNumChildren(Node_T oNParent) {
+/* come back add comments */
+int Node_addChild(Node_T oNParent, Node_T oNChild, size_t ulIndex) {
    assert(oNParent != NULL);
+   assert(oNChild != NULL);
    assert(oNParent->uType == TYPE_DIR);
 
-   return DynArray_getLength(oNParent->oDChildren);
+   if (DynArray_addAt(oNParent->oDChildren, ulIndex, oNChild) == 0)
+      return MEMORY_ERROR;
+
+   return SUCCESS;
 }
 
 /*
@@ -358,6 +363,14 @@ int Node_getChild(Node_T oNParent, size_t ulChildID, Node_T *poNResult) {
    *poNResult = DynArray_get(oNParent->oDChildren, ulChildID);
 
    return SUCCESS;
+}
+
+/* Returns the number of children that oNParent has. */
+size_t Node_getNumChildren(Node_T oNParent) {
+   assert(oNParent != NULL);
+   assert(oNParent->uType == TYPE_DIR);
+
+   return DynArray_getLength(oNParent->oDChildren);
 }
 
 /*
@@ -389,8 +402,8 @@ int Node_compare(Node_T oNFirst, Node_T oNSecond) {
       return 1; /* first is greater than second */
    }
 
-   /* if not opposing types, return compare string like normal */
-   return Path_compareString(Node_getPath(oNFirst), Node_getPath(oNSecond));
+   /* if not opposing types, return compare path like normal */
+   return Path_comparePath(Node_getPath(oNFirst), Node_getPath(oNSecond));
 }
 
 /*
@@ -407,7 +420,7 @@ char *Node_toString(Node_T oNNode) {
 
    assert(oNNode != NULL);
 
-   pcPathString = Path_getPathString(oNNode->oPPath);
+   pcPathString = Path_getPathname(oNNode->oPPath);
 
    /* account for newline / null*/
    ulLength = strlen(pcPathString) + 2;
@@ -420,19 +433,21 @@ char *Node_toString(Node_T oNNode) {
       size_t i;
       size_t ulNumChildren = DynArray_getLength(oNNode->oDChildren);
 
+
       /* newline for directory name before children*/
       strcat(pcResult, "\n");
 
       for (i = 0; i < ulNumChildren; i++) {
          Node_T oChild = DynArray_get(oNNode->oDChildren, i);
          char *pcChildString = Node_toString(oChild);
-         
+         char *pcTemp;
+
          if (pcChildString != NULL) { 
             /* update length with current result + child string + newline (this is recursive)*/
             ulLength += strlen(pcChildString) +1;
 
             /* expanding logic with memeory error check*/
-            char *pcTemp = realloc(pcResult, ulLength);
+            pcTemp = realloc(pcResult, ulLength);
             if (pcTemp == NULL) {
                free(pcChildString);
                free(pcResult);
@@ -452,5 +467,4 @@ char *Node_toString(Node_T oNNode) {
    }
 
    return pcResult;
-
 }
