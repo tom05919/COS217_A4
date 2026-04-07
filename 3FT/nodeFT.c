@@ -373,6 +373,16 @@ size_t Node_getNumChildren(Node_T oNParent) {
    return DynArray_getLength(oNParent->oDChildren);
 }
 
+/* Remove (unlink) the child at ulChildID from oNParent's children array.
+   Caller is responsible for freeing the node. */
+void Node_unlinkChild(Node_T oNParent, size_t ulChildID) {
+   assert(oNParent != NULL);
+   assert(oNParent->uType == TYPE_DIR);
+   assert(ulChildID < DynArray_getLength(oNParent->oDChildren));
+
+   DynArray_removeAt(oNParent->oDChildren, ulChildID);
+}
+
 /*
   Returns a the parent node of oNNode.
   Returns NULL if oNNode is the root and thus has no parent.

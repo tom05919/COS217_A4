@@ -80,6 +80,10 @@ size_t Node_getNumChildren(Node_T oNParent);
 int Node_getChild(Node_T oNParent, size_t ulChildID,
                   Node_T *poNResult);
 
+/* Remove (unlink) the child at ulChildID from oNParent's children array.
+   Caller is responsible for freeing the node. */
+void Node_unlinkChild(Node_T oNParent, size_t ulChildID);
+
 /*
   Returns a the parent node of oNNode.
   Returns NULL if oNNode is the root and thus has no parent.

@@ -3,28 +3,35 @@
 # Author: Ty Lipscomb and Tom Wang
 #--------------------------------------------------------------------
 
+#--------------------------------------------------------------------
+# Makefile for the File Tree (FT) Module
+# Author: Ty Lipscomb and Tom Wang
+#--------------------------------------------------------------------
+
 # Macros
 CC = gcc217
-# Use -g for debugging with gdb or valgrind
 CFLAGS = -g
 
-# The default target
-all: testNode
+# Default target
+all: myft
 
-# Link the executable
+# Link the final executable
 # Note: path.o and dynarray.o must be present in your directory
-testNode: testNode.o nodeFT.o path.o dynarray.o
-	$(CC) $(CFLAGS) testNode.o nodeFT.o path.o dynarray.o -o testNode
+myft: ft_client.o ft.o nodeFT.o path.o dynarray.o
+	$(CC) $(CFLAGS) ft_client.o ft.o nodeFT.o path.o dynarray.o -o myft
 
-# Compile testNode.o
-testNode.o: testNode.c nodeFT.h path.h a4def.h
-	$(CC) $(CFLAGS) -c testNode.c
+# Compile the client
+ft_client.o: ft_client.c ft.h a4def.h
+	$(CC) $(CFLAGS) -c ft_client.c
 
-# Compile nodeFT.o
-# This depends on all headers it includes
+# Compile the FT manager
+ft.o: ft.c ft.h nodeFT.h path.h a4def.h
+	$(CC) $(CFLAGS) -c ft.c
+
+# Compile the Node module
 nodeFT.o: nodeFT.c nodeFT.h path.h dynarray.h a4def.h
 	$(CC) $(CFLAGS) -c nodeFT.c
 
-# Clean up the directory
+# Clean target to remove generated files
 clean:
-	rm -f testNode *.o
+	rm -f myft *.o

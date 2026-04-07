@@ -76,19 +76,41 @@ int main(void) {
 
    /* 7. TEST: Conflicting Path Error */
    /* Try to add a child to a file (oFile1) */
+   Path_free(pFile2); /* Free the previous path before reusing */
    assert(Path_new("root/file1/bad", &pFile2) == SUCCESS);
    iStatus = Node_new(pFile2, oFile1, TYPE_FILE, &oTemp, 0, NULL);
    assert(iStatus == NOT_A_DIRECTORY);
    printf("Step 7: Error handling (NOT_A_DIRECTORY) verified.\n");
 
-   /* 8. TEST: Recursive Free */
+   /* 8. TEST: Node_getPath */
+   {
+      const char *pcPath;
+      pcPath = Path_getPathname(Node_getPath(oRoot));
+      assert(strcmp(pcPath, "root") == 0);
+      pcPath = Path_getPathname(Node_getPath(oDir1));
+      assert(strcmp(pcPath, "root/dir1") == 0);
+      pcPath = Path_getPathname(Node_getPath(oFile1));
+      assert(strcmp(pcPath, "root/file1") == 0);
+   }
+   printf("Step 8: Node_getPath verified.\n");
+
+   /* 9. TEST: Node_getParent for children */
+   assert(Node_getParent(oDir1) == oRoot);
+   assert(Node_getParent(oFile1) == oRoot);
+   printf("Step 9: Node_getParent for children verified.\n");
+
+   /* 10. TEST: Node_compare */
+   assert(Node_compare(oFile1, oDir1) < 0); /* file before dir */
+   assert(Node_compare(oDir1, oFile1) > 0); /* dir after file */
+   printf("Step 10: Node_compare verified.\n");
+
+   /* 11. TEST: Recursive Free */
    ulCount = Node_free(oRoot);
    /* Root + Dir1 + File1 = 3 nodes */
-   printf("Step 8: Deleted %lu nodes.\n", (unsigned long)ulCount);
+   printf("Step 11: Deleted %lu nodes.\n", (unsigned long)ulCount);
    assert(ulCount == 3);
 
    printf("\n--- ALL TESTS PASSED SUCCESSFULLY ---\n");
-   
    /* Cleanup leftover paths */
    Path_free(pRoot);
    Path_free(pDir1);
