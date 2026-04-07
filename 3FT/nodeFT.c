@@ -54,9 +54,8 @@ int Node_new(Path_T oPPath, Node_T oNParent, NodeType uType, Node_T *poNResult, 
    size_t ulParentDepth;
    size_t ulIndex;
    int iStatus;
-
+   
    assert(oPPath != NULL);
-   assert(oNParent == NULL || CheckerDT_Node_isValid(oNParent));
    assert(uType == TYPE_DIR || uType == TYPE_FILE);
 
 	/* logic for validating the contents and length based on node type */
@@ -93,6 +92,7 @@ int Node_new(Path_T oPPath, Node_T oNParent, NodeType uType, Node_T *poNResult, 
       ulParentDepth = Path_getDepth(oPParentPath);
       ulSharedDepth = Path_getSharedPrefixDepth(psNew->oPPath,
                                                 oPParentPath);
+                                                
       /* parent must be an ancestor of child */
       if(ulSharedDepth < ulParentDepth) {
          Path_free(psNew->oPPath);
@@ -269,9 +269,8 @@ size_t Node_free(Node_T oNNode) {
       for(i = 0; i < ulNumChildren; i++) {
          oChild = DynArray_get(oNNode->oDChildren, i);
 
-         Node_free(oChild);
-
-         ulCount += 1;
+         /* recursive behavior through all the children*/
+         ulCount += Node_free(oChild);
       }
       /* free the remaining child*/
       DynArray_free(oNNode->oDChildren);
@@ -313,8 +312,15 @@ boolean Node_hasChild(Node_T oNParent, Path_T oPPath, size_t *pulChildID) {
    assert(pulChildID != NULL);
 
    TempNode.oPPath = oPPath;
-   TempNode.uType = TYPE_FILE;
 
+   /* try it assuming file type*/
+   TempNode.uType = TYPE_FILE;
+   if (DynArray_bsearch(oNParent->oDChildren, &TempNode, pulChildID, (int(*)(const void*, const void*))Node_compare)) {
+      return TRUE;
+   } 
+
+   /* for DIR type*/
+   TempNode.uType = TYPE_DIR;
    return DynArray_bsearch(oNParent->oDChildren, &TempNode, pulChildID, (int(*)(const void*, const void*))Node_compare);
 
 }
@@ -334,14 +340,35 @@ size_t Node_getNumChildren(Node_T oNParent) {
   * NO_SUCH_PATH if ulChildID is not a valid child for oNParent
 */
 int Node_getChild(Node_T oNParent, size_t ulChildID, Node_T *poNResult) {
-   
+   assert(oNParent != NULL);
+   assert(poNResult != NULL);
+
+   /* only directories have children*/
+   if (oNParent->uType != TYPE_DIR) {
+      *poNResult = NULL;
+      return NOT_A_DIRECTORY;
+   }
+
+   if (ulChildID >= DynArray_getLength(oNParent->oDChildren)) {
+      *poNResult = NULL;
+      return NO_SUCH_PATH;
+   }
+
+   /* outputted child */
+   *poNResult = DynArray_get(oNParent->oDChildren, ulChildID);
+
+   return SUCCESS;
 }
 
 /*
   Returns a the parent node of oNNode.
   Returns NULL if oNNode is the root and thus has no parent.
 */
-Node_T Node_getParent(Node_T oNNode);
+Node_T Node_getParent(Node_T oNNode) {
+   assert(oNNode != NULL);
+
+   return oNNode->oNParent;
+}
 
 /*
   Compares oNFirst and oNSecond lexicographically based on their paths.
@@ -365,8 +392,6 @@ int Node_compare(Node_T oNFirst, Node_T oNSecond) {
    /* if not opposing types, return compare string like normal */
    return Path_compareString(Node_getPath(oNFirst), Node_getPath(oNSecond));
 }
-   
-
 
 /*
   Returns a string representation for oNNode, or NULL if
@@ -375,4 +400,57 @@ int Node_compare(Node_T oNFirst, Node_T oNSecond) {
   Allocates memory for the returned string, which is then owned by
   the caller!
 */
-char *Node_toString(Node_T oNNode);
+char *Node_toString(Node_T oNNode) {
+   char *pcResult;
+   const char *pcPathString;
+   size_t ulLength;
+
+   assert(oNNode != NULL);
+
+   pcPathString = Path_getPathString(oNNode->oPPath);
+
+   /* account for newline / null*/
+   ulLength = strlen(pcPathString) + 2;
+   pcResult = malloc(ulLength);
+
+   /* copy path string to the result*/
+   strcpy(pcResult, pcPathString);
+
+   if (oNNode->uType == TYPE_DIR) {
+      size_t i;
+      size_t ulNumChildren = DynArray_getLength(oNNode->oDChildren);
+
+      /* newline for directory name before children*/
+      strcat(pcResult, "\n");
+
+      for (i = 0; i < ulNumChildren; i++) {
+         Node_T oChild = DynArray_get(oNNode->oDChildren, i);
+         char *pcChildString = Node_toString(oChild);
+         
+         if (pcChildString != NULL) { 
+            /* update length with current result + child string + newline (this is recursive)*/
+            ulLength += strlen(pcChildString) +1;
+
+            /* expanding logic with memeory error check*/
+            char *pcTemp = realloc(pcResult, ulLength);
+            if (pcTemp == NULL) {
+               free(pcChildString);
+               free(pcResult);
+               return NULL;
+            }
+            pcResult = pcTemp;
+
+            /* add the child and cleanup child char*/
+            strcat(pcResult, pcChildString);
+            strcat(pcResult, "\n");
+            free(pcChildString);
+         }
+
+      }
+      /* remove trailing newline*/
+      pcResult[strlen(pcResult) - 1] = '\0';
+   }
+
+   return pcResult;
+
+}
