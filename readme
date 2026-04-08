@@ -125,13 +125,145 @@ your disagreements with them? Copy the splint warnings here, and
 express your disagreement after each warning. If there are no
 warnings, then write "None."
 
+(1) Many warnings of the form:
+   "Return value type enum { SUCCESS, ... } does not match declared type int"
+   "Operands of != have incompatible types (int, enum { SUCCESS, ... })"
+We disagree. These arise because a4def.h defines status codes as an
+anonymous enum, but our functions return int per the ft.h interface.
+In C, enum values are implicitly convertible to int. This pattern is
+inherited from the provided DT code infrastructure.
 
+(2) Many warnings of the form:
+   "Operand of ! is non-boolean (boolean): !bIsInitialized"
+   "Test expression for if not boolean, type boolean"
+We disagree. These arise because a4def.h defines boolean as an enum
+type, and splint does not recognize it as a boolean without the
+-booltype flag. The usage is correct.
+
+(3) nodeFT.c Node_find and Node_hasChild:
+   "Return value type int does not match declared type boolean"
+We disagree. DynArray_bsearch returns int (0 or 1), which we return
+as boolean (FALSE=0, TRUE=1). The implicit conversion is correct.
+
+(4) Many warnings of the form:
+   "Null storage oPPath passed as non-null param"
+   "Null storage oNNode passed as non-null param"
+   "Function returns with null storage derivable from parameter"
+We disagree. In each case, the code checks for NULL or error
+conditions before the potentially-null pointer is used. Splint does
+not track control flow precisely enough to see that the NULL case has
+already been handled by an early return.
+
+(5) Many warnings of the form:
+   "Only storage ... derived from released storage is not released"
+   "Implicitly temp storage ... assigned to implicitly only"
+   "Fresh storage ... not released before return"
+We disagree. These concern splint's ownership annotations. Our code
+correctly manages memory: Node_free recursively frees children and
+their paths, and returned pointers are owned by the caller per the
+interface contract. These are false positives from splint's static
+analysis limitations.
+
+(6) nodeFT.c Node_new:
+   "Variable ulIndex used before definition"
+We disagree. ulIndex is always set by Node_hasChild or Node_find
+before it is used. The path where ulIndex is used (oNParent != NULL)
+always calls one of those functions first.
+
+(7) nodeFT.c Node_new:
+   "Storage psNew->pvContents is released in one path, but live"
+We disagree. When Node_addChild fails, we free psNew->pvContents
+in the file branch and DynArray_free in the directory branch. The
+storage is correctly cleaned up on each path.
+
+(8) nodeFT.c Node_getContents / Node_getPath / Node_getParent:
+   "Function returns reference to parameter"
+   "Released storage ... reachable from parameter at return point"
+We disagree. These are accessor functions that intentionally return
+pointers to internal data. The caller does not own or free the
+returned pointer. This is standard practice for accessor functions.
+
+(9) nodeFT.c Node_setContents:
+   "Null storage returned as non-null: NULL"
+We disagree. Returning NULL signals allocation failure. The caller
+is expected to check for NULL. The /*@null@*/ annotation is not used
+because we follow the existing DT code conventions.
+
+(10) ft.c:
+   "Function malloc expects arg 1 to be size_t gets int: 1"
+   "Operands of != have incompatible types (size_t, int)"
+We disagree. The integer literal 1 is safely promoted to size_t.
+This is standard C behavior.
+
+(11) nodeFT.h:
+   "Function exported but not used outside nodeFT: Node_find"
+   "Function exported but not used outside nodeFT: Node_addChild"
+   "Function exported but not used outside nodeFT: Node_compare"
+We disagree. These functions are declared in the header as part of
+the module's interface. They are available for use by other modules
+or for testing, even if ft.c does not currently call them directly.
+
+(12) dynarray.h / path.h:
+   "Function ... declared but not defined"
+These modules are compiled separately and linked. This is not an
+error in our code.
+
+(13) ft_client.c warnings:
+All splint warnings in ft_client.c originate from the provided
+client code and are not part of our implementation.
 
 ------------------------------------------------------------------------
 What warnings does critTer generate on your Part 3 code, and what are
 your disagreements with them? Copy the critTer warnings here, and
 express your disagreement after each warning. If there are no
 warnings, then write "None."
+
+(1) nodeFT.c: line 58: low priority:
+   "A function should consist of fewer than 140 lines;
+    this function consists of 151 lines; consider refactoring"
+Exempt per assignment instructions (too long function).
+
+(2) nodeFT.c: line 493: low priority:
+   "A file should contain no more than 15 functions;
+    this file contains 16 functions"
+Exempt per assignment instructions (too many functions).
+
+(3) nodeFT.c: line 474: low priority:
+   "This area is deeply nested at level 4, consider refactoring"
+Exempt per assignment instructions (too deeply nested).
+
+(4) ft.c: line 126: low priority:
+   "A loop should consist of fewer than 35 lines;
+    this loop consists of 40 lines; consider refactoring"
+Exempt per assignment instructions (too long loop).
+
+(5) nodeFT.h: line 18: high priority:
+   "A comment should appear above each global variable."
+We disagree. There is a comment immediately above the NodeType
+typedef on line 17: "Enumeration to differentiate between directory
+and file nodes." critTer misidentifies this typedef as a global
+variable requiring a separate comment.
+
+(6) nodeFT.c: line 235: medium priority:
+   "Do you want to validate 'pvNewContents' through an assert?"
+We disagree. pvNewContents can legitimately be NULL when clearing
+a file's contents or creating an empty file. Adding an assert would
+break valid use cases.
+
+(7) ft.c: line 89: medium priority:
+   "Do you want to validate 'pvContents' through an assert?"
+We disagree. pvContents can legitimately be NULL for empty files
+or directories. The function handles NULL pvContents correctly.
+
+(8) ft.c: line 270: medium priority:
+   "Do you want to validate 'pvContents' through an assert?"
+We disagree. Same reasoning as (7). FT_insertFile allows NULL
+pvContents for files with no initial content.
+
+(9) ft.c: line 363: medium priority:
+   "Do you want to validate 'pvNewContents' through an assert?"
+We disagree. Same reasoning as (6). FT_replaceFileContents allows
+NULL pvNewContents to clear a file's contents.
 
 
 
@@ -160,6 +292,39 @@ the error manifests itself or is "noticed" by the client.
 What are your critiques of the given DT implementations, as
 specified in Step 2.5?
 
+* dt.c is not a true abstract object because it stores all tree state in file-scope globals 
+(bIsInitialized, oNRoot, ulCount). A refactor should make the tree an actual object/struct 
+instead of a hidden singleton.
 
+* The API is inconsistent about return style: some functions return status codes, some return 
+pointers, some use out-parameters, and DT_contains collapses every error into FALSE. The 
+interface should use one clear convention.
+
+* Both modules are too tightly coupled to checkerDT through implementation-time assertions. 
+That is useful for debugging, but it weakens modularity and should be optional or debug-only.
+
+* Node_new has an allocation-cleanup bug: if Node_addChild fails, it frees the node and path 
+but does not free the already-allocated oDChildren.
+
+* DT_toString does not check whether DynArray_new(ulCount) succeeded before using it, so its 
+allocation-error handling is incomplete.
+
+* Some names are misleading. Node_hasChild sounds like a boolean predicate, but it also returns 
+the child index used for lookup/insertion. A name like Node_findChildIndex would better match its role.
+
+* DT_traversePath repeatedly allocates prefix Path_T objects while walking the tree. That works, but it 
+is heavier and less clean than a child-lookup interface based on path components.
+
+* DT_insert is more complicated than it should be because Node_new both creates a node and immediately 
+links it into the parent. Separating creation from attachment would simplify rollback on failure.
+
+* Node_free does too much: it detaches the node, recursively frees the subtree, and returns a node count. 
+That mixes destruction with tree-management policy and makes the interface less clean.
+
+* DT_toString is more clever than necessary: it builds a dynarray, maps once for length, then maps again 
+with repeated strcat. A single traversal with a write pointer or growable buffer would be clearer and more efficient.
+
+* A few helper comments also suggest awkward interfaces, like the “inverted” accumulator helpers for string building. 
+Refactoring for simpler helper contracts would improve readability and make the module easier to maintain.
 
 ------------------------------------------------------------------------

@@ -80,11 +80,13 @@ static int FT_traversePath(Path_T oPPath, Node_T *poNResult) {
 }
 
 /*
- PRIVATE HELPER: FT_insertNode                                      
- Centralizes the logic for inserting both Directories and Files.    
- Creates intermediate directories if they do not exist.             
+  Inserts a node with path oPPath and type uType into the tree.
+  If uType is TYPE_FILE, pvContents and ulLength specify the file
+  contents and their byte length. Creates intermediate directories
+  as needed. Returns SUCCESS or a non-SUCCESS status on failure.
 */
-static int FT_insertNode(Path_T oPPath, NodeType uType, void *pvContents, size_t ulLength) {
+static int FT_insertNode(Path_T oPPath, NodeType uType,
+                         void *pvContents, size_t ulLength) {
    Node_T oNCurr = oNRoot;
    size_t i, ulDepth, ulChildID;
    int iStatus;
@@ -143,7 +145,7 @@ static int FT_insertNode(Path_T oPPath, NodeType uType, void *pvContents, size_t
             Path_free(oPPrefix);
             return ALREADY_IN_TREE;
          }
-         Node_getChild(oNCurr, ulChildID, &oNCurr);
+         (void)Node_getChild(oNCurr, ulChildID, &oNCurr);
       } else {
          /* Node is missing, create it */
          if (i == ulDepth) {
@@ -178,7 +180,7 @@ int FT_init(void) {
 int FT_destroy(void) {
    if (!bIsInitialized) return INITIALIZATION_ERROR;
    if (oNRoot != NULL) {
-      Node_free(oNRoot);
+      (void)Node_free(oNRoot);
       oNRoot = NULL;
    }
    bIsInitialized = FALSE;
@@ -189,6 +191,7 @@ int FT_insertDir(const char *pcPath) {
    Path_T oPPath = NULL;
    int iStatus;
 
+   assert(pcPath != NULL);
    if (!bIsInitialized) return INITIALIZATION_ERROR;
 
    iStatus = Path_new(pcPath, &oPPath);
@@ -204,6 +207,7 @@ boolean FT_containsDir(const char *pcPath) {
    Node_T oNNode = NULL;
    int iStatus;
 
+   assert(pcPath != NULL);
    if (!bIsInitialized) return FALSE;
 
    iStatus = Path_new(pcPath, &oPPath);
@@ -225,6 +229,7 @@ int FT_rmDir(const char *pcPath) {
    size_t ulIndex;
    int iStatus;
 
+   assert(pcPath != NULL);
    if (!bIsInitialized) return INITIALIZATION_ERROR;
 
    iStatus = Path_new(pcPath, &oPPath);
@@ -243,7 +248,7 @@ int FT_rmDir(const char *pcPath) {
 
    /* Special case: removing the root */
    if (oNNode == oNRoot) {
-      Node_free(oNRoot);
+      (void)Node_free(oNRoot);
       oNRoot = NULL;
       Path_free(oPPath);
       return SUCCESS;
@@ -254,17 +259,19 @@ int FT_rmDir(const char *pcPath) {
    if (Node_hasChild(oNParent, oPPath, &ulIndex)) {
       /* UNLINK from parent's array before freeing */
       Node_unlinkChild(oNParent, ulIndex); 
-      Node_free(oNNode);
+      (void)Node_free(oNNode);
    }
 
    Path_free(oPPath);
    return SUCCESS;
 }
 
-int FT_insertFile(const char *pcPath, void *pvContents, size_t ulLength) {
+int FT_insertFile(const char *pcPath, void *pvContents,
+                  size_t ulLength) {
    Path_T oPPath = NULL;
    int iStatus;
 
+   assert(pcPath != NULL);
    if (!bIsInitialized) return INITIALIZATION_ERROR;
 
    iStatus = Path_new(pcPath, &oPPath);
@@ -280,6 +287,7 @@ boolean FT_containsFile(const char *pcPath) {
    Node_T oNNode = NULL;
    int iStatus;
 
+   assert(pcPath != NULL);
    if (!bIsInitialized) return FALSE;
 
    iStatus = Path_new(pcPath, &oPPath);
@@ -301,6 +309,7 @@ int FT_rmFile(const char *pcPath) {
    size_t ulIndex;
    int iStatus;
 
+   assert(pcPath != NULL);
    if (!bIsInitialized) return INITIALIZATION_ERROR;
 
    iStatus = Path_new(pcPath, &oPPath);
@@ -322,7 +331,7 @@ int FT_rmFile(const char *pcPath) {
    if (Node_hasChild(oNParent, oPPath, &ulIndex)) {
       /* UNLINK from parent's array before freeing */
       Node_unlinkChild(oNParent, ulIndex); 
-      Node_free(oNNode);
+      (void)Node_free(oNNode);
    }
 
    Path_free(oPPath);
@@ -334,6 +343,7 @@ void *FT_getFileContents(const char *pcPath) {
    Node_T oNNode = NULL;
    int iStatus;
 
+   assert(pcPath != NULL);
    if (!bIsInitialized) return NULL;
 
    iStatus = Path_new(pcPath, &oPPath);
@@ -349,11 +359,13 @@ void *FT_getFileContents(const char *pcPath) {
    return Node_getContents(oNNode);
 }
 
-void *FT_replaceFileContents(const char *pcPath, void *pvNewContents, size_t ulNewLength) {
+void *FT_replaceFileContents(const char *pcPath, void *pvNewContents,
+                             size_t ulNewLength) {
    Path_T oPPath = NULL;
    Node_T oNNode = NULL;
    int iStatus;
 
+   assert(pcPath != NULL);
    if (!bIsInitialized) return NULL;
 
    iStatus = Path_new(pcPath, &oPPath);
@@ -374,6 +386,7 @@ int FT_stat(const char *pcPath, boolean *pbIsFile, size_t *pulSize) {
    Node_T oNNode = NULL;
    int iStatus;
 
+   assert(pcPath != NULL);
    assert(pbIsFile != NULL);
    assert(pulSize != NULL);
 

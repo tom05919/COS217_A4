@@ -11,37 +11,49 @@
 #include "path.h"
 
 
-/* A Node_T is a node in a File Tree */
+/* A Node_T is a node in a File Tree. */
 typedef struct node *Node_T;
 
-/* Used to differentiate between directories and files in the same node structure. */
+/* Enumeration to differentiate between directory and file nodes. */
 typedef enum {TYPE_DIR, TYPE_FILE} NodeType;
 
 /*
-  Built upon the original node logic.
-  Can take in either a directory or file node, determined by NodeType.
-  If uType is TYPE_DIR, then pvContents and ulLength should be set to NULL (unused).
-  If uType is TYPE_FILE, then pvContents and ulLength should be set to the file's contents and length, respectively.
-  Both will take in oPPath and oNParent as before.
-  Returns SUCCESS if the new node is created successfully.
+  Creates a new node with absolute path oPPath, parent oNParent, and
+  type uType. If uType is TYPE_DIR, pvContents and ulLength are
+  unused. If uType is TYPE_FILE, pvContents and ulLength specify the
+  file contents and their byte length. Stores the new node in
+  *poNResult. Returns SUCCESS if created, or a non-SUCCESS status
+  on failure.
 */
-int Node_new(Path_T oPPath, Node_T oNParent, NodeType uType, Node_T *poNResult, size_t ulLength, void *pvContents);
+int Node_new(Path_T oPPath, Node_T oNParent, NodeType uType,
+             Node_T *poNResult, size_t ulLength, void *pvContents);
 
-/* Internal helper function - finds a child node */
-boolean Node_find(Node_T oNParent, Path_T oPPath, NodeType uType, size_t *pulIndex);
+/*
+  Searches oNParent's children for a node matching oPPath and uType.
+  Stores the child's index in *pulIndex if found. Returns TRUE if
+  found, FALSE otherwise.
+*/
+boolean Node_find(Node_T oNParent, Path_T oPPath, NodeType uType,
+                  size_t *pulIndex);
 
-/* new functions defined before */
-/* Returns the NodeType of a provided node (oNNode)*/
+/* Returns the NodeType (TYPE_DIR or TYPE_FILE) of oNNode. */
 NodeType Node_getType(Node_T oNNode);
 
-/* Returns a pointer to the contents of a provided file node (oNNode) MUST BE FILE TYPE OTHERWISE RETURN ERROR */
+/* Returns a pointer to the contents of file node oNNode.
+   oNNode must be of TYPE_FILE. */
 void *Node_getContents(Node_T oNNode);
 
-/* returns file length. Cannot call on directory nodes otherwise logic error*/
+/* Returns the byte length of the contents of file node oNNode.
+   oNNode must be of TYPE_FILE. */
 size_t Node_getContentsLength(Node_T oNNode);
 
-/* updates the file contents. Returns the old contents on success, ERROR on failure*/
-void *Node_setContents(Node_T oNNode, void *pvNewContents, size_t ulNewLength);
+/*
+  Replaces the contents of file node oNNode with pvNewContents of
+  length ulNewLength bytes. Returns the old contents on success.
+  oNNode must be of TYPE_FILE. Returns NULL on allocation failure.
+*/
+void *Node_setContents(Node_T oNNode, void *pvNewContents,
+                       size_t ulNewLength);
 
 /*
   Destroys and frees all memory allocated for the subtree rooted at
@@ -65,7 +77,10 @@ Path_T Node_getPath(Node_T oNNode);
 boolean Node_hasChild(Node_T oNParent, Path_T oPPath,
                          size_t *pulChildID);
 
-/* Internal helper function - adds a child node */
+/*
+  Inserts oNChild into oNParent's children array at position ulIndex.
+  Returns SUCCESS on success, or MEMORY_ERROR on allocation failure.
+*/
 int Node_addChild(Node_T oNParent, Node_T oNChild, size_t ulIndex);
 
 /* Returns the number of children that oNParent has. */
@@ -85,20 +100,19 @@ int Node_getChild(Node_T oNParent, size_t ulChildID,
 void Node_unlinkChild(Node_T oNParent, size_t ulChildID);
 
 /*
-  Returns a the parent node of oNNode.
+  Returns the parent node of oNNode.
   Returns NULL if oNNode is the root and thus has no parent.
 */
 Node_T Node_getParent(Node_T oNNode);
 
 
-/* add comments*/
-int Node_compare(Node_T oNFirst, Node_T oNSecond);
-
 /*
   Compares oNFirst and oNSecond lexicographically based on their paths.
-  Returns <0, 0, or >0 if onFirst is "less than", "equal to", or
-  "greater than" oNSecond, respectively.
+  Files sort before directories at the same level. Returns <0, 0, or
+  >0 if oNFirst is "less than", "equal to", or "greater than"
+  oNSecond, respectively.
 */
+int Node_compare(Node_T oNFirst, Node_T oNSecond);
 
 /*
   Returns a string representation for oNNode, or NULL if

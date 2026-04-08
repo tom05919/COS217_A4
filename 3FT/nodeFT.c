@@ -12,6 +12,7 @@
 #include "path.h"
 #include "nodeFT.h"
 
+/* A node in the file tree, representing either a directory or file. */
 struct node {
    /* the object corresponding to the node's absolute path */
    Path_T oPPath;
@@ -30,13 +31,19 @@ struct node {
 
 };
 
-/* come back to this and add comments */
-boolean Node_find(Node_T oNParent, Path_T oPPath, NodeType uType, size_t *pulIndex) {
+boolean Node_find(Node_T oNParent, Path_T oPPath, NodeType uType,
+                  size_t *pulIndex) {
    struct node sDummy;
+
+   assert(oNParent != NULL);
+   assert(oPPath != NULL);
+   assert(pulIndex != NULL);
+
    sDummy.oPPath = oPPath;
    sDummy.uType = uType;
-   
-   return DynArray_bsearch(oNParent->oDChildren, &sDummy, pulIndex, (int(*)(const void*, const void*))Node_compare);
+
+   return DynArray_bsearch(oNParent->oDChildren, &sDummy, pulIndex,
+      (int(*)(const void*, const void*))Node_compare);
 }
 
 /*
@@ -47,15 +54,17 @@ boolean Node_find(Node_T oNParent, Path_T oPPath, NodeType uType, size_t *pulInd
   Both will take in oPPath and oNParent as before.
   Returns SUCCESS if the new node is created successfully.
 */
-int Node_new(Path_T oPPath, Node_T oNParent, NodeType uType, Node_T *poNResult, size_t ulLength, void *pvContents) {
+int Node_new(Path_T oPPath, Node_T oNParent, NodeType uType,
+   Node_T *poNResult, size_t ulLength, void *pvContents) {
    struct node *psNew;
    Path_T oPParentPath = NULL;
    Path_T oPNewPath = NULL;
    size_t ulParentDepth;
    size_t ulIndex;
    int iStatus;
-   
+
    assert(oPPath != NULL);
+   assert(poNResult != NULL);
    assert(uType == TYPE_DIR || uType == TYPE_FILE);
 
 	/* logic for validating the contents and length based on node type */
@@ -117,7 +126,7 @@ int Node_new(Path_T oPPath, Node_T oNParent, NodeType uType, Node_T *poNResult, 
          return ALREADY_IN_TREE;
       }
       /* updates ulIndex to the spot it should be in case hasChild messes it up */
-      Node_find(oNParent, oPPath, uType, &ulIndex);
+      (void)Node_find(oNParent, oPPath, uType, &ulIndex);
    }
    else {
 		/* new node must be root AND dir */
@@ -200,7 +209,6 @@ int Node_new(Path_T oPPath, Node_T oNParent, NodeType uType, Node_T *poNResult, 
 }
 
 
-/* new functions defined before */
 /* Returns the NodeType of a provided node (oNNode)*/
 NodeType Node_getType(Node_T oNNode) {
    assert(oNNode != NULL);
@@ -326,8 +334,12 @@ boolean Node_hasChild(Node_T oNParent, Path_T oPPath, size_t *pulChildID) {
 
 }
 
-/* come back add comments */
-int Node_addChild(Node_T oNParent, Node_T oNChild, size_t ulIndex) {
+/*
+  Inserts oNChild into oNParent's children array at position ulIndex.
+  Returns SUCCESS on success, or MEMORY_ERROR on allocation failure.
+*/
+int Node_addChild(Node_T oNParent, Node_T oNChild,
+                  size_t ulIndex) {
    assert(oNParent != NULL);
    assert(oNChild != NULL);
    assert(oNParent->uType == TYPE_DIR);
@@ -380,7 +392,7 @@ void Node_unlinkChild(Node_T oNParent, size_t ulChildID) {
    assert(oNParent->uType == TYPE_DIR);
    assert(ulChildID < DynArray_getLength(oNParent->oDChildren));
 
-   DynArray_removeAt(oNParent->oDChildren, ulChildID);
+   (void)DynArray_removeAt(oNParent->oDChildren, ulChildID);
 }
 
 /*
@@ -394,9 +406,10 @@ Node_T Node_getParent(Node_T oNNode) {
 }
 
 /*
-  Compares oNFirst and oNSecond lexicographically based on their paths.
-  Returns <0, 0, or >0 if onFirst is "less than", "equal to", or
-  "greater than" oNSecond, respectively.
+  Compares oNFirst and oNSecond. Files sort before directories at
+  the same level. Within the same type, compares lexicographically
+  by path. Returns <0, 0, or >0 if oNFirst is "less than", "equal
+  to", or "greater than" oNSecond, respectively.
 */
 int Node_compare(Node_T oNFirst, Node_T oNSecond) {
    assert(oNFirst != NULL);
@@ -435,8 +448,8 @@ char *Node_toString(Node_T oNNode) {
    /* account for newline / null*/
    ulLength = strlen(pcPathString) + 2;
    pcResult = malloc(ulLength);
+   if (pcResult == NULL) return NULL;
 
-   /* copy path string to the result*/
    strcpy(pcResult, pcPathString);
 
    if (oNNode->uType == TYPE_DIR) {
