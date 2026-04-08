@@ -15,7 +15,12 @@
 typedef struct node *Node_T;
 
 /* Enumeration to differentiate between directory and file nodes. */
-typedef enum {TYPE_DIR, TYPE_FILE} NodeType;
+typedef enum {
+   /* directory node type */
+   TYPE_DIR,
+   /* file node type */
+   TYPE_FILE
+} NodeType;
 
 /*
   Creates a new node with absolute path oPPath, parent oNParent, and

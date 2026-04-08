@@ -272,6 +272,7 @@ int FT_insertFile(const char *pcPath, void *pvContents,
    int iStatus;
 
    assert(pcPath != NULL);
+   assert(ulLength == 0 || pvContents != NULL);
    if (!bIsInitialized) return INITIALIZATION_ERROR;
 
    iStatus = Path_new(pcPath, &oPPath);
@@ -366,6 +367,7 @@ void *FT_replaceFileContents(const char *pcPath, void *pvNewContents,
    int iStatus;
 
    assert(pcPath != NULL);
+   assert(ulNewLength == 0 || pvNewContents != NULL);
    if (!bIsInitialized) return NULL;
 
    iStatus = Path_new(pcPath, &oPPath);

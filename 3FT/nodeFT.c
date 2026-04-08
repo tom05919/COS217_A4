@@ -236,6 +236,7 @@ void *Node_setContents(Node_T oNNode, void *pvNewContents, size_t ulNewLength) {
    void *pvOldContents;
    assert(oNNode != NULL);
    assert(oNNode->uType == TYPE_FILE);
+   assert(ulNewLength == 0 || pvNewContents != NULL);
    pvOldContents = oNNode->pvContents;
 
   if (ulNewLength > 0 && pvNewContents != NULL) {
